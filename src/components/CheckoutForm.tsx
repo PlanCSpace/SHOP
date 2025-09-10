@@ -26,6 +26,8 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
   const [userBalance, setUserBalance] = useState<number>(0);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [isWalletConnected, setIsWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string>('');
 
   const [formData, setFormData] = useState<ShippingAddress>({
     fullName: '',
@@ -47,10 +49,16 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
     const checkBalance = async () => {
       const connectionCheck = await checkPhantomConnection();
       if (connectionCheck.connected && connectionCheck.address) {
+        setIsWalletConnected(true);
+        setWalletAddress(connectionCheck.address);
         const balanceResult = await checkMemexSolBalance(connectionCheck.address);
         if (!balanceResult.error) {
           setUserBalance(balanceResult.balance);
         }
+      } else {
+        setIsWalletConnected(false);
+        setWalletAddress('');
+        setUserBalance(0);
       }
     };
 
@@ -68,6 +76,19 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Phantom Wallet bağlantı kontrolü
+    if (!isWalletConnected) {
+      setPaymentError(
+        language === 'tr' 
+          ? 'Lütfen önce Phantom Wallet\'ınızı bağlayın.' 
+          : language === 'ar'
+          ? 'يرجى ربط محفظة Phantom أولاً.'
+          : 'Please connect your Phantom Wallet first.'
+      );
+      return;
+    }
+    
     // Basic validation
     if (!formData.fullName || !formData.addressLine1 || !formData.city || !formData.zipCode || !formData.country || !formData.email || !formData.phone) {
       setPaymentError(
@@ -76,6 +97,16 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
           : language === 'ar'
           ? 'يرجى ملء جميع الحقول المطلوبة.'
           : 'Please fill in all required fields.'
+      );
+      return;
+    }
+    
+    // Bakiye kontrolü
+    if (userBalance < total) {
+      setPaymentError(
+        language === 'tr' 
+          ? `Yetersiz MEMEXSOL bakiyesi. Mevcut: ${userBalance.toFixed(2)}, Gerekli: ${total.toFixed(2)}` 
+          : `Insufficient MEMEXSOL balance. Available: ${userBalance.toFixed(2)}, Required: ${total.toFixed(2)}`
       );
       return;
     }
@@ -378,7 +409,19 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
                   </p>
                 </div>
               )}
-              {userBalance === 0 && (
+              {!isWalletConnected && (
+              <div className="bg-red-50 dark:bg-red-900/20 rounded p-3 border border-red-200 dark:border-red-700">
+                <p className="text-xs text-red-800 dark:text-red-200">
+                  {language === 'tr' 
+                    ? '❌ Phantom Wallet bağlı değil! Lütfen önce cüzdanınızı bağlayın.' 
+                    : language === 'ar' 
+                    ? '❌ محفظة Phantom غير متصلة! يرجى ربط محفظتك أولاً.'
+                    : '❌ Phantom Wallet not connected! Please connect your wallet first.'
+                  }
+                </p>
+              </div>
+              )}
+              {isWalletConnected && userBalance === 0 && (
               <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded p-3 border border-yellow-200 dark:border-yellow-700">
                 <p className="text-xs text-yellow-800 dark:text-yellow-200">
                   {language === 'tr' 
@@ -421,9 +464,9 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isProcessingPayment || userBalance < total}
+              disabled={isProcessingPayment || !isWalletConnected || userBalance < total}
               className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center space-x-2 ${
-                isProcessingPayment || userBalance < total
+                isProcessingPayment || !isWalletConnected || userBalance < total
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700'
               } text-white`}
@@ -443,7 +486,14 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
               ) : (
                 <>
                   <Wallet size={20} />
-                  <span>{t('payAndPlaceOrder')}</span>
+                  <span>
+                    {!isWalletConnected 
+                      ? (language === 'tr' ? 'Cüzdan Bağlayın' : 'Connect Wallet')
+                      : userBalance < total 
+                      ? (language === 'tr' ? 'Yetersiz Bakiye' : 'Insufficient Balance')
+                      : t('payAndPlaceOrder')
+                    }
+                  </span>
                 </>
               )}
             </button>
