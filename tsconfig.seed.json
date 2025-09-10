@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noEmit": false,
+    "outDir": "./dist-seed",
+    "allowImportingTsExtensions": true
+  },
+  "include": ["seed.ts", "src/**/*.ts"],
+  "exclude": ["node_modules"]
+}
